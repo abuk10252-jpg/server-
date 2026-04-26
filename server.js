@@ -1,10 +1,10 @@
 const express = require("express");
 const cors = require("cors");
-const seedSuperAdmin = require("./utils/seedSuperAdmin");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+const seedSuperAdmin = require("./utils/seedSuperAdmin");
 
 // ربط المسارات
 app.use("/api/auth", require("./routes/auth"));
