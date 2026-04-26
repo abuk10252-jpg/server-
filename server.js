@@ -1,10 +1,18 @@
 const express = require("express");
 const cors = require("cors");
 
+// أول حاجة: حمّل firebase.js
+require("./utils/firebase");
+
+// بعدين: حمّل seedSuperAdmin
+const seedSuperAdmin = require("./utils/seedSuperAdmin");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
-const seedSuperAdmin = require("./utils/seedSuperAdmin");
+
+// شغّل السوبر أدمن بعد ما firebase اتعمل ليهو initialize
+seedSuperAdmin();
 
 // ربط المسارات
 app.use("/api/auth", require("./routes/auth"));
