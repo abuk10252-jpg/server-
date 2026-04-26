@@ -4,7 +4,7 @@ const db = admin.firestore();
 async function seedSuperAdmin() {
   const email = "abuk10252@gmail.com";
   const password = "Aaabus06555$";
-  const name = "Super Admin";
+  const name = "Aboubaker Awad";
 
   const userRef = db.collection("admins").doc(email);
   const doc = await userRef.get();
