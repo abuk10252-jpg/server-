@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const seedSuperAdmin = require("./utils/seedSuperAdmin");
 
 const app = express();
 app.use(cors());
