@@ -1,24 +1,35 @@
 const express = require("express");
 const cors = require("cors");
+const dotenv = require("dotenv");
+const authRoutes = require("./routes/auth");
+const { admin, db } = require("./utils/firebase");
 
-// أول حاجة: حمّل firebase.js
-require("./utils/firebase");
-
-// بعدين: حمّل seedSuperAdmin
-const seedSuperAdmin = require("./utils/seedSuperAdmin");
+dotenv.config();
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// شغّل السوبر أدمن بعد ما firebase اتعمل ليهو initialize
-seedSuperAdmin();
+// Routes
+app.use("/api/auth", authRoutes);
 
-// ربط المسارات
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/files", require("./routes/files"));
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ status: "OK" });
+});
 
-app.get("/", (req, res) => res.json({ ok: true }));
+// Error handling
+app.use((err, req, res, next) => {
+  console.error("Server error:", err);
+  res.status(500).json({ error: err.message });
+});
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+module.exports = app;
