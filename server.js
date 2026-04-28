@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// ✅ استيرد Firebase
 const { db, auth } = require("./utils/firebase");
 
 const app = express();
@@ -11,46 +10,6 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-
-
-
-    console.log("🔄 Checking admin existence...");
-
-    // جرب إنشاء في Firebase Auth
-    try {
-      await auth.createUser({
-        email: adminEmail,
-        password: adminPassword,
-        displayName: "Admin",
-      });
-      console.log("✅ Admin created in Firebase Auth");
-    } catch (error) {
-      if (error.code === "auth/email-already-exists") {
-        console.log("✅ Admin already exists in Firebase Auth");
-      } else {
-        console.error("⚠️ Auth error:", error.message);
-      }
-    }
-
-    // احفظ في Firestore
-    await db.collection("users").doc(adminEmail).set({
-      email: adminEmail,
-      displayName: "Admin",
-      role: "admin",
-      createdAt: new Date(),
-    }, { merge: true });
-
-    console.log("✅ Admin setup complete!");
-    console.log("📧 Email: abuk10252@gmail.com");
-    console.log("🔐 Password: Aaabus06555$");
-  } catch (error) {
-    console.error("❌ Admin setup error:", error.message);
-  }
-}
-
-// استدعِ الدالة
-ensureSuperAdminExists();
 
 // Routes
 const authRoutes = require("./routes/auth");
@@ -61,7 +20,7 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "Server is running ✅" });
 });
 
-// 404
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
@@ -72,6 +31,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal Server Error" });
 });
 
+// Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
