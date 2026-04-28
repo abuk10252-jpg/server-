@@ -1,26 +1,33 @@
 const admin = require("firebase-admin");
-require("dotenv").config();
 
-let serviceAccount;
-
-try {
-  if (process.env.FIREBASE_CREDENTIALS) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
-  } else {
-    throw new Error("FIREBASE_CREDENTIALS not found");
-  }
-} catch (error) {
-  console.error("❌ Error parsing FIREBASE_CREDENTIALS:", error.message);
+// تحقق من وجود بيانات Firebase
+if (!process.env.FIREBASE_CREDENTIALS) {
+  console.error("❌ ERROR: FIREBASE_CREDENTIALS environment variable not set!");
   process.exit(1);
 }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  storageBucket: process.env.STORAGE_BUCKET || serviceAccount.storage_bucket,
-});
+let serviceAccount;
+
+// حاول تحليل JSON
+try {
+  serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+} catch (error) {
+  console.error("❌ ERROR: Invalid JSON in FIREBASE_CREDENTIALS:", error.message);
+  process.exit(1);
+}
+
+// تهيئ Firebase Admin SDK
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log("✅ Firebase initialized successfully");
+} catch (error) {
+  console.error("❌ ERROR initializing Firebase:", error.message);
+  process.exit(1);
+}
 
 const db = admin.firestore();
 const auth = admin.auth();
 
-// ✅ حذفنا bucket من هنا
 module.exports = { admin, db, auth };
