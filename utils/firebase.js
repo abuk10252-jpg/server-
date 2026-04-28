@@ -4,7 +4,6 @@ require("dotenv").config();
 let serviceAccount;
 
 try {
-  // محاولة parse JSON من FIREBASE_CREDENTIALS
   if (process.env.FIREBASE_CREDENTIALS) {
     serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
   } else {
@@ -21,8 +20,7 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-const auth = admin.auth();  // ✅ أضفنا هذا
-const bucket = admin.storage().bucket();
+const auth = admin.auth();
 
-// ✅ أضفنا auth إلى الـ export
-module.exports = { admin, db, auth, bucket };
+// ✅ حذفنا bucket من هنا
+module.exports = { admin, db, auth };
