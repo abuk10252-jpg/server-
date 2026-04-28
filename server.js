@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// ✅ استيرد Firebase من firebase.js (بدلاً من تهيئته مرة أخرى)
+// ✅ استيرد Firebase من firebase.js
 const { db, auth } = require("./utils/firebase");
 
 const app = express();
@@ -12,59 +12,39 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ دالة إنشاء Super Admin تلقائياً
+// ✅ دالة إنشاء Super Admin تلقائياً (مبسطة)
 async function ensureSuperAdminExists() {
   try {
     const adminEmail = "abuk10252@gmail.com";
     const adminPassword = "Aaabus06555$";
 
-    // تحقق إذا المستخدم موجود في Firestore
-    const userSnapshot = await db
-      .collection("users")
-      .where("email", "==", adminEmail)
-      .limit(1)
-      .get();
-
-    if (!userSnapshot.empty) {
-      console.log("✅ Super Admin already exists in database");
-      return;
-    }
-
-    // حاول إنشاء المستخدم في Firebase Auth
-    let userRecord;
+    // جرب إنشاء الحساب
     try {
-      userRecord = await auth.createUser({
+      await auth.createUser({
         email: adminEmail,
         password: adminPassword,
-        displayName: "Super Admin",
+        displayName: "Admin",
       });
-      console.log("✅ Super Admin Auth User Created:", userRecord.uid);
-    } catch (authError) {
-      if (authError.code === "auth/email-already-exists") {
-        console.log("⚠️ Email already exists in Firebase Auth, retrieving user...");
-        userRecord = await auth.getUserByEmail(adminEmail);
+      console.log("✅ Admin created in Firebase Auth");
+    } catch (error) {
+      if (error.code === "auth/email-already-exists") {
+        console.log("✅ Admin already exists in Firebase Auth");
       } else {
-        throw authError;
+        throw error;
       }
     }
 
-    // حفظ بيانات المستخدم في Firestore
-    await db.collection("users").doc(userRecord.uid).set({
-      uid: userRecord.uid,
+    // احفظ في Firestore
+    await db.collection("users").doc(adminEmail).set({
       email: adminEmail,
-      displayName: "Super Admin",
+      displayName: "Admin",
       role: "admin",
       createdAt: new Date(),
-      updatedAt: new Date(),
-      isVerified: true,
-      isActive: true,
-    });
+    }, { merge: true });
 
-    console.log("✅ Super Admin Firestore Document Created");
-    console.log("📧 Email:", adminEmail);
-    console.log("🔐 Password:", adminPassword);
+    console.log("✅ Admin setup complete!");
   } catch (error) {
-    console.error("❌ Error ensuring super admin:", error.message);
+    console.error("❌ Admin setup error:", error.message);
   }
 }
 
