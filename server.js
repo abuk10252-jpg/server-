@@ -12,11 +12,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ دالة إنشاء Super Admin
-async function ensureSuperAdminExists() {
-  try {
-    const adminEmail = "abuk10252@gmail.com";
-    const adminPassword = "Aaabus06555$";
+
+
 
     console.log("🔄 Checking admin existence...");
 
