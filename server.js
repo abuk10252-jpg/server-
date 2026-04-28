@@ -1,7 +1,9 @@
 const express = require("express");
 const cors = require("cors");
-const admin = require("firebase-admin");
 require("dotenv").config();
+
+// ✅ استيرد Firebase من firebase.js (بدلاً من تهيئته مرة أخرى)
+const { db, auth } = require("./utils/firebase");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -9,27 +11,6 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Firebase Admin SDK
-let serviceAccount;
-
-try {
-  if (process.env.FIREBASE_CREDENTIALS) {
-    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
-  } else {
-    throw new Error("FIREBASE_CREDENTIALS not found in environment variables");
-  }
-} catch (error) {
-  console.error("❌ Error parsing FIREBASE_CREDENTIALS:", error.message);
-  process.exit(1);
-}
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-const db = admin.firestore();
-const auth = admin.auth();
 
 // ✅ دالة إنشاء Super Admin تلقائياً
 async function ensureSuperAdminExists() {
@@ -60,7 +41,6 @@ async function ensureSuperAdminExists() {
       console.log("✅ Super Admin Auth User Created:", userRecord.uid);
     } catch (authError) {
       if (authError.code === "auth/email-already-exists") {
-        // إذا المستخدم موجود بالفعل في Auth، احصل على بيانته
         console.log("⚠️ Email already exists in Firebase Auth, retrieving user...");
         userRecord = await auth.getUserByEmail(adminEmail);
       } else {
@@ -85,7 +65,6 @@ async function ensureSuperAdminExists() {
     console.log("🔐 Password:", adminPassword);
   } catch (error) {
     console.error("❌ Error ensuring super admin:", error.message);
-    // لا توقف السيرفر، استمر في التشغيل
   }
 }
 
