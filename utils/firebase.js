@@ -1,15 +1,22 @@
 const admin = require("firebase-admin");
 
-const serviceAccount = {
-  type: "service_account",
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-};
+let serviceAccount;
+
+try {
+  // محاولة parse JSON من FIREBASE_CREDENTIALS
+  if (process.env.FIREBASE_CREDENTIALS) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+  } else {
+    throw new Error("FIREBASE_CREDENTIALS not found");
+  }
+} catch (error) {
+  console.error("Error parsing FIREBASE_CREDENTIALS:", error.message);
+  process.exit(1);
+}
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  storageBucket: process.env.STORAGE_BUCKET,
+  storageBucket: process.env.STORAGE_BUCKET || serviceAccount.storage_bucket,
 });
 
 const db = admin.firestore();
