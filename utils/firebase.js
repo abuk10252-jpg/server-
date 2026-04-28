@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+require("dotenv").config();
 
 let serviceAccount;
 
@@ -10,7 +11,7 @@ try {
     throw new Error("FIREBASE_CREDENTIALS not found");
   }
 } catch (error) {
-  console.error("Error parsing FIREBASE_CREDENTIALS:", error.message);
+  console.error("❌ Error parsing FIREBASE_CREDENTIALS:", error.message);
   process.exit(1);
 }
 
@@ -20,6 +21,8 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+const auth = admin.auth();  // ✅ أضفنا هذا
 const bucket = admin.storage().bucket();
 
-module.exports = { admin, db, bucket };
+// ✅ أضفنا auth إلى الـ export
+module.exports = { admin, db, auth, bucket };
