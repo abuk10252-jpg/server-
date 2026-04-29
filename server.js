@@ -13,7 +13,12 @@ app.use(express.json());
 
 // Routes
 const authRoutes = require("./routes/auth");
+const newsRoutes = require("./routes/news");
+const coursesRoutes = require("./routes/courses");
+
 app.use("/api/auth", authRoutes);
+app.use("/api/news", newsRoutes);
+app.use("/api/courses", coursesRoutes);
 
 // Health Check
 app.get("/api/health", (req, res) => {
