@@ -19,6 +19,7 @@ const coursesRoutes = require("./routes/courses");
 app.use("/api/auth", authRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/courses", coursesRoutes);
+app.use("/api/notifications", require("./routes/notifications"));
 
 // Health Check
 app.get("/api/health", (req, res) => {
