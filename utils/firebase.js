@@ -29,5 +29,8 @@ try {
 
 const db = admin.firestore();
 const auth = admin.auth();
+// اسم الـ bucket لازم يتظبط في متغير البيئة FIREBASE_STORAGE_BUCKET
+// (نفس القيمة الموجودة في .env بتاع الفرونت إند: EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET)
+const bucket = admin.storage().bucket(process.env.FIREBASE_STORAGE_BUCKET || undefined);
 
-module.exports = { admin, db, auth };
+module.exports = { admin, db, auth, bucket };

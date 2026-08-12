@@ -159,4 +159,24 @@ router.delete('/news/:id', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// 🔥 API: نتائج اختبار معيّن (للأدمن)
+router.get('/quiz/:id/results', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const doc = await admin.firestore().collection('news').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Quiz not found' });
+
+    const quiz = doc.data();
+    if (quiz.type !== 'quiz') return res.status(400).json({ error: 'Not a quiz post' });
+
+    const submissions = (quiz.quiz_submissions || []).slice().sort((a, b) => b.score - a.score);
+
+    return res.json({
+      quiz: { id: doc.id, title: quiz.title, quiz_questions: quiz.quiz_questions },
+      submissions,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load quiz results' });
+  }
+});
+
 module.exports = router;
