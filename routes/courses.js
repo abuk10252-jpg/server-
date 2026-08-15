@@ -7,10 +7,9 @@ const { db, bucket } = require("../utils/firebase");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB لكل ملف
+  limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-// ============ Middlewares ============
 async function verifyToken(req, res, next) {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -41,15 +40,14 @@ async function requireAdmin(req, res, next) {
   next();
 }
 
-// ============ إنشاء مادة جديدة (أدمن فقط) ============
 router.post("/", verifyToken, loadUser, requireAdmin, async (req, res) => {
   try {
-    const { title, title_ar, description, description_ar } = req.body;
-    if (!title) return res.status(400).json({ error: "Title is required" });
+    const { name, name_ar, description, description_ar } = req.body;
+    if (!name) return res.status(400).json({ error: "Name is required" });
 
     const courseData = {
-      title,
-      title_ar: title_ar || "",
+      name,
+      name_ar: name_ar || "",
       description: description || "",
       description_ar: description_ar || "",
       files: [],
@@ -64,7 +62,6 @@ router.post("/", verifyToken, loadUser, requireAdmin, async (req, res) => {
   }
 });
 
-// ============ جلب كل المواد ============
 router.get("/", verifyToken, async (req, res) => {
   try {
     const snapshot = await db.collection("courses").orderBy("created_at", "desc").get();
@@ -75,7 +72,6 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ============ جلب مادة واحدة (مع ملفاتها) ============
 router.get("/:id", verifyToken, async (req, res) => {
   try {
     const doc = await db.collection("courses").doc(req.params.id).get();
@@ -86,13 +82,12 @@ router.get("/:id", verifyToken, async (req, res) => {
   }
 });
 
-// ============ تعديل مادة (أدمن فقط) ============
 router.put("/:id", verifyToken, loadUser, requireAdmin, async (req, res) => {
   try {
-    const { title, title_ar, description, description_ar } = req.body;
+    const { name, name_ar, description, description_ar } = req.body;
     const updates = {};
-    if (title !== undefined) updates.title = title;
-    if (title_ar !== undefined) updates.title_ar = title_ar;
+    if (name !== undefined) updates.name = name;
+    if (name_ar !== undefined) updates.name_ar = name_ar;
     if (description !== undefined) updates.description = description;
     if (description_ar !== undefined) updates.description_ar = description_ar;
 
@@ -103,7 +98,6 @@ router.put("/:id", verifyToken, loadUser, requireAdmin, async (req, res) => {
   }
 });
 
-// ============ حذف مادة (أدمن فقط) ============
 router.delete("/:id", verifyToken, loadUser, requireAdmin, async (req, res) => {
   try {
     await db.collection("courses").doc(req.params.id).delete();
@@ -113,8 +107,6 @@ router.delete("/:id", verifyToken, loadUser, requireAdmin, async (req, res) => {
   }
 });
 
-// ============ رفع ملف لمادة (أدمن فقط) ============
-// الفرونت إند بيبعت multipart/form-data مباشرة (مش رابط رفع من نوعين)
 router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -161,7 +153,6 @@ router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("fi
   }
 });
 
-// ============ حذف ملف من مادة (أدمن فقط) ============
 router.delete("/:id/files/:fileId", verifyToken, loadUser, requireAdmin, async (req, res) => {
   try {
     const courseRef = db.collection("courses").doc(req.params.id);
@@ -175,9 +166,7 @@ router.delete("/:id/files/:fileId", verifyToken, loadUser, requireAdmin, async (
     await courseRef.update({ files: remaining });
 
     if (target?.path) {
-      await bucket.file(target.path).delete().catch(() => {
-        // لو الملف مش موجود في الـ storage أصلاً، تجاهل الخطأ ده
-      });
+      await bucket.file(target.path).delete().catch(() => {});
     }
 
     return res.json({ success: true });
