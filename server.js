@@ -40,8 +40,8 @@ app.get("/api/search", async (req, res) => {
     const courses = snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(c =>
-        (c.title || "").toLowerCase().includes(q) ||
-        (c.title_ar || "").toLowerCase().includes(q) ||
+        (c.name || "").toLowerCase().includes(q) ||
+        (c.name_ar || "").toLowerCase().includes(q) ||
         (c.description || "").toLowerCase().includes(q)
       );
 
