@@ -59,7 +59,8 @@ router.post('/', verifyToken, loadUser, requireAdmin, async (req, res) => {
       image: image || '',
       created_at: Date.now(),
       created_by: req.uid,
-      created_by_name: req.user?.displayName || req.user?.name || 'Admin',
+      created_by_name: req.user?.name || req.user?.displayName || 'Admin',
+      created_by_photo: req.user?.profile_pic || req.user?.photoURL || '',
       reactions: {},
       user_reactions: {},
       comments: [],
@@ -182,7 +183,8 @@ router.post('/:id/comment', verifyToken, loadUser, async (req, res) => {
     const comment = {
       id: genId(),
       user_id: req.uid,
-      user_name: req.user?.displayName || req.user?.name || 'User',
+      user_name: req.user?.name || req.user?.displayName || 'User',
+      user_photo: req.user?.profile_pic || req.user?.photoURL || '',
       text: text.trim(),
       reply_to: reply_to ? { id: reply_to.id, name: reply_to.name, text: reply_to.text } : null,
       created_at: Date.now(),
@@ -254,7 +256,8 @@ router.post('/:id/submit-quiz', verifyToken, loadUser, async (req, res) => {
 
     const submission = {
       user_id: req.uid,
-      user_name: req.user?.displayName || req.user?.name || 'User',
+      user_name: req.user?.name || req.user?.displayName || 'User',
+      user_photo: req.user?.profile_pic || req.user?.photoURL || '',
       answers,
       score,
       total: data.quiz_questions.length,
