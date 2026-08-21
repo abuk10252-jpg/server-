@@ -162,18 +162,26 @@ router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("fi
       course_id: req.params.id,
       course_name: courseName,
       folder,
+      file_id: fileId,
       file_name: displayName,
       file_type: ext,
       created_at: Date.now(),
       read: false,
     }).catch(err => console.error("notification error:", err.message));
 
+    // منشور الأخبار بتاع الملف الجديد نوعه "file" مش "news" العادي،
+    // عشان الفرونت إند يعرضه كمربع صغير بدون تعليقات، ويودي مباشرة للملف
     db.collection("news").add({
-      type: "news",
+      type: "file",
       title: "ملف جديد",
       title_ar: "ملف جديد",
       content: `تم رفع "${displayName}" في مجلد "${folder}" - مادة ${courseName}`,
       content_ar: `تم رفع "${displayName}" في مجلد "${folder}" - مادة ${courseName}`,
+      course_id: req.params.id,
+      folder,
+      file_id: fileId,
+      file_name: displayName,
+      file_type: ext,
       created_by: req.uid,
       created_by_name: uploaderName,
       created_by_photo: req.user?.profile_pic || "",
