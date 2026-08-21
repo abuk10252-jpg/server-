@@ -2,6 +2,14 @@ const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
 const db = admin.firestore();
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+const { uploadToR2 } = require('../utils/r2');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 ميجا كافية لمرفقات الأخبار (صور/صوت)
+});
 
 // ============ Middlewares ============
 async function verifyToken(req, res, next) {
@@ -281,6 +289,23 @@ router.post('/:id/publish-results', verifyToken, loadUser, requireAdmin, async (
     return res.json({ success: true });
   } catch (e) {
     return res.status(500).json({ error: 'Failed to publish results' });
+  }
+});
+
+// رفع مرفق للخبر (صورة/صوت) - بيرفع على Cloudflare R2 ويرجّع الرابط
+router.post('/upload-attachment', verifyToken, loadUser, requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'لا يوجد ملف' });
+
+    const ext = (req.file.originalname.split('.').pop() || 'bin').toLowerCase();
+    const key = `news_attachments/${Date.now()}_${uuidv4()}.${ext}`;
+
+    const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+
+    res.json({ success: true, url });
+  } catch (err) {
+    console.error('Upload attachment error:', err.message);
+    res.status(500).json({ error: err.message || 'فشل رفع المرفق' });
   }
 });
 

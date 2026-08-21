@@ -1,7 +1,14 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const { admin, db } = require("../utils/firebase");
 const authMiddleware = require("../middleware/authMiddleware");
+const { uploadToR2 } = require("../utils/r2");
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 ميجا كافية لصورة بروفايل
+});
 
 // تسجيل جديد
 router.post("/register", async (req, res) => {
@@ -176,6 +183,26 @@ router.post("/logout", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("Logout error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// رفع صورة البروفايل (بترفع على Cloudflare R2 وتحفظ الرابط في Firestore)
+router.post("/upload-photo", authMiddleware, upload.single("photo"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "لا يوجد ملف" });
+
+    const uid = req.user.uid;
+    const ext = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
+    const key = `avatars/${uid}.${ext}`;
+
+    const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+
+    await db.collection("users").doc(uid).update({ profile_pic: url });
+
+    res.json({ ok: true, profile_pic: url });
+  } catch (err) {
+    console.error("Upload photo error:", err.message);
+    res.status(500).json({ error: err.message || "فشل رفع الصورة" });
   }
 });
 

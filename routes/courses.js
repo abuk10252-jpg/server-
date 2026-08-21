@@ -3,11 +3,12 @@ const router = express.Router();
 const multer = require("multer");
 const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
-const { db, bucket } = require("../utils/firebase");
+const { db } = require("../utils/firebase");
+const { uploadToR2, deleteFromR2 } = require("../utils/r2");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 500 * 1024 * 1024 }, // لغاية 500 ميجا للملف الواحد
 });
 
 async function verifyToken(req, res, next) {
@@ -118,19 +119,8 @@ router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("fi
     const fileId = uuidv4();
     const ext = (req.file.originalname.split(".").pop() || "").toLowerCase();
     const storagePath = `courses/${req.params.id}/${fileId}.${ext}`;
-    const blob = bucket.file(storagePath);
 
-    await new Promise((resolve, reject) => {
-      const stream = blob.createWriteStream({
-        metadata: { contentType: req.file.mimetype },
-      });
-      stream.on("error", reject);
-      stream.on("finish", resolve);
-      stream.end(req.file.buffer);
-    });
-
-    await blob.makePublic();
-    const url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    const url = await uploadToR2(req.file.buffer, storagePath, req.file.mimetype);
 
     const fileData = {
       id: fileId,
@@ -166,7 +156,7 @@ router.delete("/:id/files/:fileId", verifyToken, loadUser, requireAdmin, async (
     await courseRef.update({ files: remaining });
 
     if (target?.path) {
-      await bucket.file(target.path).delete().catch(() => {});
+      await deleteFromR2(target.path).catch(() => {});
     }
 
     return res.json({ success: true });
