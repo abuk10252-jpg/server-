@@ -120,11 +120,26 @@ router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("fi
     const ext = (req.file.originalname.split(".").pop() || "").toLowerCase();
     const storagePath = `courses/${req.params.id}/${fileId}.${ext}`;
 
+    // React Native بيبعت اسم الملف مُرمّز (percent-encoded) لو فيه حروف عربية،
+    // فبنفكه هنا عشان الاسم يرجع يبان صح
+    let decodedOriginalName = req.file.originalname;
+    try {
+      decodedOriginalName = decodeURIComponent(req.file.originalname);
+    } catch {
+      // لو مش مرمّز أصلاً، سيبه زي ما هو
+    }
+
+    // لو الأدمن كتب اسم مخصص للملف، بنستخدمه؛ لو لأ بنستخدم الاسم الأصلي بعد فكه
+    const displayName = (req.body.name && req.body.name.trim()) || decodedOriginalName;
+    const folder = (req.body.folder && req.body.folder.trim()) || "General";
+
     const url = await uploadToR2(req.file.buffer, storagePath, req.file.mimetype);
 
     const fileData = {
       id: fileId,
-      name: req.file.originalname,
+      name: displayName,
+      folder,
+      type: ext,
       url,
       path: storagePath,
       size: req.file.size,
@@ -135,6 +150,38 @@ router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("fi
     await courseRef.update({
       files: admin.firestore.FieldValue.arrayUnion(fileData),
     });
+
+    // إشعار + منشور في الأخبار بالملف الجديد ومساره الكامل
+    const courseData = courseDoc.data();
+    const courseName = courseData.name_ar || courseData.name || "";
+    const uploaderName = req.user?.name || req.user?.displayName || "Admin";
+
+    db.collection("notifications").add({
+      title: "ملف جديد",
+      body: `${uploaderName} رفع "${displayName}" في مجلد "${folder}" - مادة ${courseName}`,
+      course_id: req.params.id,
+      course_name: courseName,
+      folder,
+      file_name: displayName,
+      file_type: ext,
+      created_at: Date.now(),
+      read: false,
+    }).catch(err => console.error("notification error:", err.message));
+
+    db.collection("news").add({
+      type: "news",
+      title: "ملف جديد",
+      title_ar: "ملف جديد",
+      content: `تم رفع "${displayName}" في مجلد "${folder}" - مادة ${courseName}`,
+      content_ar: `تم رفع "${displayName}" في مجلد "${folder}" - مادة ${courseName}`,
+      created_by: req.uid,
+      created_by_name: uploaderName,
+      created_by_photo: req.user?.profile_pic || "",
+      created_at: Date.now(),
+      reactions: {},
+      user_reactions: {},
+      comments: [],
+    }).catch(err => console.error("news post error:", err.message));
 
     return res.json({ success: true, file: fileData });
   } catch (err) {
