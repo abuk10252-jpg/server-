@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require("uuid");
 const admin = require("firebase-admin");
 const { db } = require("../utils/firebase");
 const { uploadToR2, deleteFromR2 } = require("../utils/r2");
+const { notifyAllUsers } = require("../utils/push");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -190,6 +191,14 @@ router.post("/:id/files", verifyToken, loadUser, requireAdmin, upload.single("fi
       user_reactions: {},
       comments: [],
     }).catch(err => console.error("news post error:", err.message));
+
+    // إشعار Push حقيقي يبان في شريط إشعارات الموبايل لكل الطلاب (ما عدا اللي رفع الملف)
+    notifyAllUsers({
+      title: "ملف جديد",
+      body: `${uploaderName} رفع "${displayName}" في مجلد "${folder}" - مادة ${courseName}`,
+      data: { course_id: req.params.id, file_id: fileId },
+      excludeUid: req.uid,
+    }).catch(err => console.error("push notification error:", err.message));
 
     return res.json({ success: true, file: fileData });
   } catch (err) {

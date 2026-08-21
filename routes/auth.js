@@ -176,6 +176,22 @@ router.put("/update", authMiddleware, async (req, res) => {
   }
 });
 
+// حفظ Expo Push Token بتاع الجهاز عشان نقدر نبعت له إشعارات فعلية على الموبايل
+router.post("/push-token", authMiddleware, async (req, res) => {
+  try {
+    const { push_token } = req.body;
+    if (!push_token) return res.status(400).json({ error: "push_token مطلوب" });
+
+    const uid = req.user.uid;
+    await db.collection("users").doc(uid).update({ push_token });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Save push token error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // تسجيل الخروج
 router.post("/logout", authMiddleware, async (req, res) => {
   try {

@@ -5,6 +5,7 @@ const db = admin.firestore();
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const { uploadToR2 } = require('../utils/r2');
+const { notifyAllUsers } = require('../utils/push');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -98,6 +99,15 @@ router.post('/', verifyToken, loadUser, requireAdmin, async (req, res) => {
     }
 
     const ref = await db.collection('news').add(data);
+
+    // إشعار Push حقيقي يبان في شريط إشعارات الموبايل لكل المستخدمين (ما عدا الأدمن اللي نشر)
+    notifyAllUsers({
+      title: title,
+      body: content || title,
+      data: { news_id: ref.id, type: data.type },
+      excludeUid: req.uid,
+    }).catch(err => console.error('push notification error:', err.message));
+
     return res.json({ success: true, id: ref.id, news: { id: ref.id, ...data } });
   } catch (e) {
     console.error(e);
