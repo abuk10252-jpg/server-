@@ -179,4 +179,40 @@ router.get('/quiz/:id/results', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+// 🔥 API: قناة دردشة خاصة بالأدمنز بس - زي واتساب، كل الأدمنز (والسوبر أدمن) بيشوفوا نفس القناة
+router.get('/chat', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const snapshot = await admin.firestore()
+      .collection('admin_chat')
+      .orderBy('created_at', 'asc')
+      .limit(200)
+      .get();
+
+    const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return res.json({ messages });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load chat' });
+  }
+});
+
+router.post('/chat', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'الرسالة فاضية' });
+
+    const messageData = {
+      text: text.trim(),
+      sender_id: req.uid,
+      sender_name: req.requester.name || req.requester.displayName || 'أدمن',
+      sender_photo: req.requester.profile_pic || '',
+      created_at: Date.now(),
+    };
+
+    const ref = await admin.firestore().collection('admin_chat').add(messageData);
+    return res.json({ success: true, message: { id: ref.id, ...messageData } });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
 module.exports = router;
