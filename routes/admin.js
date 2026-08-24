@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
+const multer = require('multer');
+const { uploadToR2 } = require('../utils/r2');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Middleware: التحقق من التوكن
 async function verifyToken(req, res, next) {
@@ -206,12 +210,99 @@ router.post('/chat', verifyToken, requireAdmin, async (req, res) => {
       sender_name: req.requester.name || req.requester.displayName || 'أدمن',
       sender_photo: req.requester.profile_pic || '',
       created_at: Date.now(),
+      edited: false,
     };
 
     const ref = await admin.firestore().collection('admin_chat').add(messageData);
     return res.json({ success: true, message: { id: ref.id, ...messageData } });
   } catch (e) {
     return res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// تعديل رسالة - بس صاحبها يقدر يعدلها
+router.put('/chat/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'الرسالة فاضية' });
+
+    const ref = admin.firestore().collection('admin_chat').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ error: 'Message not found' });
+    if (doc.data().sender_id !== req.uid) {
+      return res.status(403).json({ error: 'تقدر تعدل رسايلك انت بس' });
+    }
+
+    await ref.update({ text: text.trim(), edited: true });
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to edit message' });
+  }
+});
+
+// حذف رسالة - صاحبها أو السوبر أدمن يقدروا يحذفوها
+router.delete('/chat/:id', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const ref = admin.firestore().collection('admin_chat').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ error: 'Message not found' });
+
+    const isOwner = doc.data().sender_id === req.uid;
+    const isSuperAdmin = req.requester.role === 'super_admin';
+    if (!isOwner && !isSuperAdmin) {
+      return res.status(403).json({ error: 'تقدر تحذف رسايلك انت بس' });
+    }
+
+    await ref.delete();
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to delete message' });
+  }
+});
+
+// معلومات القناة - صورتها + قائمة الأدمنز (زي بروفايل قروب الواتساب)
+router.get('/chat/info', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const metaDoc = await admin.firestore().collection('admin_chat_meta').doc('info').get();
+    const meta = metaDoc.exists ? metaDoc.data() : { photo_url: '' };
+
+    const usersSnap = await admin.firestore()
+      .collection('users')
+      .where('role', 'in', ['admin', 'super_admin'])
+      .get();
+
+    const members = usersSnap.docs.map(doc => {
+      const u = doc.data();
+      return {
+        id: doc.id,
+        name: u.name || u.displayName || 'أدمن',
+        photo: u.profile_pic || '',
+        role: u.role,
+      };
+    });
+
+    return res.json({ photo_url: meta.photo_url || '', members });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load channel info' });
+  }
+});
+
+// تغيير صورة القناة - أي أدمن يقدر يغيرها زي قروب الواتساب
+router.post('/chat/photo', verifyToken, requireAdmin, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'الصورة مطلوبة' });
+
+    const key = `admin_chat/channel_photo_${Date.now()}.jpg`;
+    const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+
+    await admin.firestore().collection('admin_chat_meta').doc('info').set(
+      { photo_url: url, updated_by: req.uid, updated_at: Date.now() },
+      { merge: true }
+    );
+
+    return res.json({ success: true, photo_url: url });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to update channel photo' });
   }
 });
 

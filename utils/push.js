@@ -8,7 +8,12 @@ async function sendExpoPush(tokens, { title, body, data }) {
   const validTokens = (tokens || []).filter(
     t => typeof t === "string" && t.startsWith("ExponentPushToken")
   );
-  if (validTokens.length === 0) return;
+  if (validTokens.length === 0) {
+    console.warn("⚠️ push: مفيش أي توكن صالح للإرسال - يعني ولا مستخدم عندو push_token متسجل في قاعدة البيانات");
+    return;
+  }
+
+  console.log(`📤 push: هبعت إشعار لـ ${validTokens.length} توكن`);
 
   const chunkSize = 100;
   for (let i = 0; i < validTokens.length; i += chunkSize) {
@@ -22,13 +27,27 @@ async function sendExpoPush(tokens, { title, body, data }) {
     }));
 
     try {
-      await fetch("https://exp.host/--/api/v2/push/send", {
+      const res = await fetch("https://exp.host/--/api/v2/push/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
         },
         body: JSON.stringify(messages),
+      });
+
+      const result = await res.json();
+      // مهم: Expo بيرجع status 200 حتى لو فيه أخطاء فردية في كل توكن -
+      // لازم نفحص كل "ticket" على حدة عشان نعرف السبب الحقيقي لو فشل
+      const tickets = result?.data || [];
+      tickets.forEach((ticket, idx) => {
+        if (ticket.status === "error") {
+          console.error(
+            `❌ push فشل للتوكن ${chunk[idx]}: ${ticket.message} (${ticket.details?.error || "unknown"})`
+          );
+        } else {
+          console.log(`✅ push اتقبل للتوكن ${chunk[idx]}`);
+        }
       });
     } catch (err) {
       console.error("Expo push send error:", err.message);
