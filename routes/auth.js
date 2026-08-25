@@ -180,11 +180,24 @@ router.put("/update", authMiddleware, async (req, res) => {
 router.post("/push-token", authMiddleware, async (req, res) => {
   try {
     const { push_token } = req.body;
-    if (!push_token) return res.status(400).json({ error: "push_token مطلوب" });
+    if (!push_token || typeof push_token !== "string") {
+      return res.status(400).json({ error: "push_token مطلوب" });
+    }
+    if (!push_token.startsWith("ExponentPushToken")) {
+      return res.status(400).json({ error: "صيغة التوكن غير صحيحة" });
+    }
 
     const uid = req.user.uid;
-    await db.collection("users").doc(uid).update({ push_token });
+    // set + merge أأمن من update لو المستند ناقص حقول
+    await db.collection("users").doc(uid).set(
+      {
+        push_token,
+        push_token_updated_at: Date.now(),
+      },
+      { merge: true }
+    );
 
+    console.log(`✅ push_token محفوظ لليوزر ${uid}: ${push_token.slice(0, 28)}...`);
     res.json({ ok: true });
   } catch (err) {
     console.error("Save push token error:", err.message);

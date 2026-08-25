@@ -3,8 +3,9 @@ const router = express.Router();
 const admin = require('firebase-admin');
 const multer = require('multer');
 const { uploadToR2 } = require('../utils/r2');
+const { sendExpoPush } = require('../utils/push');
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 // Middleware: التحقق من التوكن
 async function verifyToken(req, res, next) {
@@ -201,11 +202,19 @@ router.get('/chat', verifyToken, requireAdmin, async (req, res) => {
 
 router.post('/chat', verifyToken, requireAdmin, async (req, res) => {
   try {
-    const { text } = req.body;
-    if (!text || !text.trim()) return res.status(400).json({ error: 'الرسالة فاضية' });
+    const { text, media_url, media_type, sticker } = req.body;
+    const hasText = text && text.trim();
+    const hasMedia = media_url && media_type;
+    const hasSticker = sticker && String(sticker).trim();
+    if (!hasText && !hasMedia && !hasSticker) {
+      return res.status(400).json({ error: 'الرسالة فاضية' });
+    }
 
     const messageData = {
-      text: text.trim(),
+      text: hasText ? text.trim() : (hasSticker ? String(sticker).trim() : ''),
+      media_url: media_url || '',
+      media_type: media_type || (hasSticker ? 'sticker' : ''),
+      sticker: hasSticker ? String(sticker).trim() : '',
       sender_id: req.uid,
       sender_name: req.requester.name || req.requester.displayName || 'أدمن',
       sender_photo: req.requester.profile_pic || '',
@@ -214,6 +223,30 @@ router.post('/chat', verifyToken, requireAdmin, async (req, res) => {
     };
 
     const ref = await admin.firestore().collection('admin_chat').add(messageData);
+
+    // إشعار Push للأدمنز التانيين (ما عدا المرسل)
+    (async () => {
+      try {
+        const snap = await admin.firestore()
+          .collection('users')
+          .where('role', 'in', ['admin', 'super_admin'])
+          .get();
+        const tokens = snap.docs
+          .filter(d => d.id !== req.uid)
+          .map(d => d.data().push_token)
+          .filter(Boolean);
+        if (tokens.length) {
+          await sendExpoPush(tokens, {
+            title: 'قناة الأدمنز',
+            body: `${messageData.sender_name}: ${messageData.text}`.slice(0, 120),
+            data: { type: 'admin_chat', message_id: ref.id },
+          });
+        }
+      } catch (err) {
+        console.error('admin chat push error:', err.message);
+      }
+    })();
+
     return res.json({ success: true, message: { id: ref.id, ...messageData } });
   } catch (e) {
     return res.status(500).json({ error: 'Failed to send message' });
@@ -303,6 +336,25 @@ router.post('/chat/photo', verifyToken, requireAdmin, upload.single('photo'), as
     return res.json({ success: true, photo_url: url });
   } catch (e) {
     return res.status(500).json({ error: 'Failed to update channel photo' });
+  }
+});
+
+
+// رفع وسائط لقناة الأدمنز (صورة / صوت)
+router.post('/chat/media', verifyToken, requireAdmin, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'لا يوجد ملف' });
+    const ext = (req.file.originalname.split('.').pop() || 'bin').toLowerCase();
+    const key = `admin_chat/media_${Date.now()}.${ext}`;
+    const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+    let media_type = 'file';
+    if ((req.file.mimetype || '').startsWith('image/')) media_type = 'image';
+    else if ((req.file.mimetype || '').startsWith('audio/')) media_type = 'audio';
+    else if ((req.file.mimetype || '').startsWith('video/')) media_type = 'video';
+    res.json({ success: true, url, media_type });
+  } catch (err) {
+    console.error('chat media upload error:', err.message);
+    res.status(500).json({ error: err.message || 'فشل رفع الملف' });
   }
 });
 

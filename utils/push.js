@@ -23,6 +23,8 @@ async function sendExpoPush(tokens, { title, body, data }) {
       title,
       body,
       sound: "default",
+      channelId: "default",
+      priority: "high",
       data: data || {},
     }));
 
