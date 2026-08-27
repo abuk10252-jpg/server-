@@ -295,10 +295,91 @@ router.post('/:id/submit-quiz', verifyToken, loadUser, async (req, res) => {
 // ============ PUBLISH QUIZ RESULTS ============
 router.post('/:id/publish-results', verifyToken, loadUser, requireAdmin, async (req, res) => {
   try {
-    await db.collection('news').doc(req.params.id).update({ quiz_results_published: true });
-    return res.json({ success: true });
+    const quizRef = db.collection('news').doc(req.params.id);
+    const quizDoc = await quizRef.get();
+    if (!quizDoc.exists) return res.status(404).json({ error: 'Quiz not found' });
+    const quiz = quizDoc.data();
+    if (quiz.type !== 'quiz') return res.status(400).json({ error: 'Not a quiz' });
+
+    await quizRef.update({ quiz_results_published: true });
+
+    const title = quiz.title || 'اختبار';
+    const titleAr = quiz.title_ar || title;
+    // منشور في الأخبار: نتيجة الاختبار (مش "تم رفع")
+    const resultPost = {
+      type: 'quiz_result',
+      title: `Result: ${title}`,
+      title_ar: `نتيجة: ${titleAr}`,
+      content: `Quiz results for "${title}" are now available. Tap to view the full ranking.`,
+      content_ar: `نتائج اختبار «${titleAr}» أصبحت متاحة. اضغط لعرض الترتيب الكامل بالأسماء.`,
+      image: '',
+      created_by: req.user.uid,
+      created_by_name: req.user.name || 'Admin',
+      created_by_photo: req.user.photo || '',
+      created_at: new Date().toISOString(),
+      reactions: {},
+      user_reactions: {},
+      comments: [],
+      quiz_id: req.params.id,
+      quiz_results_published: true,
+    };
+    const ref = await db.collection('news').add(resultPost);
+
+    // إشعار اختياري
+    try {
+      const { notifyAllUsers } = require('../utils/push');
+      if (typeof notifyAllUsers === 'function') {
+        await notifyAllUsers({
+          title: titleAr.startsWith('نتيجة') ? titleAr : `نتيجة: ${titleAr}`,
+          body: 'اضغط لعرض نتائج الاختبار',
+          data: { type: 'quiz_result', quiz_id: req.params.id },
+        });
+      }
+    } catch (e) {
+      console.warn('push after publish-results:', e.message);
+    }
+
+    return res.json({ success: true, result_news_id: ref.id });
   } catch (e) {
+    console.error('publish-results', e);
     return res.status(500).json({ error: 'Failed to publish results' });
+  }
+});
+
+
+// نتائج اختبار منشورة — للطلاب
+router.get('/:id/public-results', verifyToken, loadUser, async (req, res) => {
+  try {
+    const doc = await db.collection('news').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+    const quiz = doc.data();
+    // لو المنشور من نوع quiz_result، نقرأ quiz_id
+    let quizDoc = doc;
+    let quizData = quiz;
+    if (quiz.type === 'quiz_result' && quiz.quiz_id) {
+      quizDoc = await db.collection('news').doc(quiz.quiz_id).get();
+      if (!quizDoc.exists) return res.status(404).json({ error: 'Quiz not found' });
+      quizData = quizDoc.data();
+    }
+    if (quizData.type !== 'quiz') return res.status(400).json({ error: 'Not a quiz' });
+    if (!quizData.quiz_results_published) {
+      return res.status(403).json({ error: 'النتائج لسه ما اتنشرت' });
+    }
+    const attempts = (quizData.quiz_submissions || []).slice().sort((a, b) => {
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      return (a.time_spent || 0) - (b.time_spent || 0);
+    });
+    return res.json({
+      quiz: {
+        id: quizDoc.id,
+        title: quizData.title,
+        title_ar: quizData.title_ar || quizData.title,
+        quiz_results_published: true,
+      },
+      attempts,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed' });
   }
 });
 

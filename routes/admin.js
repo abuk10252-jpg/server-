@@ -173,14 +173,53 @@ router.get('/quiz/:id/results', verifyToken, requireAdmin, async (req, res) => {
     const quiz = doc.data();
     if (quiz.type !== 'quiz') return res.status(400).json({ error: 'Not a quiz post' });
 
-    const submissions = (quiz.quiz_submissions || []).slice().sort((a, b) => b.score - a.score);
+    const attempts = (quiz.quiz_submissions || []).slice().sort((a, b) => {
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      return (a.time_spent || 0) - (b.time_spent || 0);
+    });
 
     return res.json({
-      quiz: { id: doc.id, title: quiz.title, quiz_questions: quiz.quiz_questions },
-      submissions,
+      quiz: {
+        id: doc.id,
+        title: quiz.title,
+        title_ar: quiz.title_ar || quiz.title,
+        quiz_questions: quiz.quiz_questions,
+        quiz_results_published: !!quiz.quiz_results_published,
+        quiz_time_limit: quiz.quiz_time_limit,
+        created_at: quiz.created_at,
+      },
+      attempts,
+      submissions: attempts,
     });
   } catch (e) {
     return res.status(500).json({ error: 'Failed to load quiz results' });
+  }
+});
+
+// نتائج منشورة — أي مستخدم مسجّل يقدر يشوفها
+router.get('/quiz/:id/public-results', verifyToken, async (req, res) => {
+  try {
+    const doc = await admin.firestore().collection('news').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Quiz not found' });
+    const quiz = doc.data();
+    if (quiz.type !== 'quiz') return res.status(400).json({ error: 'Not a quiz' });
+    if (!quiz.quiz_results_published) {
+      return res.status(403).json({ error: 'النتائج لسه ما اتنشرت' });
+    }
+    const attempts = (quiz.quiz_submissions || []).slice().sort((a, b) => {
+      if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+      return (a.time_spent || 0) - (b.time_spent || 0);
+    });
+    return res.json({
+      quiz: {
+        id: doc.id,
+        title: quiz.title,
+        title_ar: quiz.title_ar || quiz.title,
+      },
+      attempts,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load public results' });
   }
 });
 
